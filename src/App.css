@@ -1,5 +1,5 @@
 .App {
-  text-align: center;
+  height: 100vh;
 }
 
 .App-logo {
@@ -26,6 +26,28 @@
 
 .App-link {
   color: #61dafb;
+}
+.chat-navbar{
+  height:4vh;
+  max-height: calc(4vh - 20px);
+  background-color: #2B6CB0 !important;
+}
+.chat-list {
+  margin-top: 10px 0px;
+  padding: 10px;
+  height: 90vh;
+  max-height: calc(90vh - 40px);
+  overflow: auto;
+}
+
+.chat-input {
+  padding: 10px 0px;
+  background-color: #f4f4f4;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 6vh;
+  max-height: 6vh;
 }
 
 @keyframes App-logo-spin {
