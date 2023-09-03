@@ -1,9 +1,11 @@
 
 var socket;
 var sessionID;
+const API_URL = window.API_URL;
+
 export function connect() {
     return new Promise((resolve, reject) => {
-        socket = new WebSocket('ws://localhost:8800/ws');
+        socket = new WebSocket(`ws://${API_URL}/ws`);
         socket.addEventListener('open', () => {
             resolve(socket);
         });
@@ -18,35 +20,31 @@ export function createSession(onError) {
     let data = {
         "id": generateRandomId(),
         "type": 3000,
-        "from": "user",
-        "to": "aiServer",
         "data": null
     }
 
-    sendWebSocketMessage(JSON.stringify(data), (message)=>{
+    sendWebSocketMessage(JSON.stringify(data), (message) => {
         let resp = JSON.parse(message);
         console.log("session created:", resp.data.session_id);
         sessionID = resp.data.session_id;
         return true;
-    }, (error)=>{
+    }, (error) => {
         console.log("create session failed:", error)
-        onError(error); 
+        onError(error);
     });
 }
 export function closeSession(id) {
     let data = {
         "id": generateRandomId(),
         "type": 3002,
-        "from": "user",
-        "to": "aiServer",
         "data": {
             "session_id": id
         }
     }
-    sendWebSocketMessage(JSON.stringify(data), (message)=>{
+    sendWebSocketMessage(JSON.stringify(data), (message) => {
         console.log("session closed:", message)
         return true;
-    }, (error)=>{
+    }, (error) => {
         console.log("close session failed:", error)
     });
 }
@@ -56,8 +54,6 @@ export function chat(question, onText, onAudio, onError) {
     let data = {
         "id": generateRandomId(),
         "type": 3003,
-        "from": "user",
-        "to": "aiServer",
         "data": {
             "session_id": sessionID,
             "request_id": requestID,
@@ -65,25 +61,38 @@ export function chat(question, onText, onAudio, onError) {
         }
     }
 
-    sendWebSocketMessage(JSON.stringify(data), (message)=>{
+    let textEnd = false;
+    let audioEnd = false;
+    sendWebSocketMessage(JSON.stringify(data), (message) => {
         let resp = JSON.parse(message);
-        if(resp.type === 3004 && resp.data.request_id === requestID) {
+        if (resp.type === 3004 && resp.data.request_id === requestID) {
             onText(requestID, resp.data.answer, resp.data.end);
-        }else if (resp.type === 3008 && resp.data.request_id === requestID) {
-            console.log("audio:", resp.data)
-            onAudio(requestID, resp.data, resp.data.end);
+            if (resp.data.end) {
+                textEnd = true;
+            }
+        } else if (resp.type === 3008 && resp.data.request_id === requestID) {
+            if (resp.data.url) {
+                onAudio(requestID, resp.data, resp.data.end);
+            }
+            if (resp.data.end) {
+                audioEnd = true;
+            }
         }
-        return resp.data.end;
-    }, (error)=>{
+
+        // return textEnd && audioEnd;
+        return false;
+    }, (error) => {
         console.log("chat failed:", error);
         onError(error);
     });
+    return requestID;
 }
 
 
 function sendWebSocketMessage(message, onMessage, onError) {
     const messageListener = (event) => {
-        if(onMessage(event.data)) {
+        if (onMessage(event.data)) {
+            console.log("remove event listener...")
             socket.removeEventListener('message', messageListener);
             socket.removeEventListener('error', errorListener);
         }

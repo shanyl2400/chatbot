@@ -7,9 +7,9 @@ import MessageList from "./components/MessageList";
 import { connect, createSession, chat } from "./api/ai";
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
+let currentAudio = null;
+const audioMap = new Map();
 function App() {
-  let currentAudio = null;
-  const audioMap = new Map();
   const inputRef = useRef(null);
   const audioRef = useRef(null);
   const [messageList, setMessageList] = useState([]);
@@ -34,31 +34,38 @@ function App() {
       audioElement.removeEventListener('ended', handleAudioEnded);
     };
   }, []);
+  // console.log(window.location.host)
 
   //音频播放完成
   const handleAudioEnded = () => {
-    console.log('音频播放结束');
+    console.log('音频播放结束', currentAudio, audioMap);
+    currentAudio.playing = false;
     // 在这里执行你想要的操作
     //播放下一条音频
     if (currentAudio) {
-      let audio = audioMap.get(currentAudio.index + 1);
-      if (audio) {
-        console.log('播放下一条音频');
-        currentAudio = {
-          index: currentAudio.index + 1,
-          src: audio.src,
-          reqestID: audio.reqID,
+      let audios = audioMap.get(currentAudio.reqestID);
+      //find index + 1 in audios
+      console.log("find next audio: ", audios, currentAudio.index, currentAudio.reqestID)
+      for (let i = 0; i < audios.length; i++) {
+        if (audios[i].index === currentAudio.index + 1) {
+          console.log('播放下一条音频, index:', audios[i].index);
+          currentAudio = {
+            index: audios[i].index,
+            src: audios[i].url,
+            reqestID: currentAudio.reqestID,
+          }
+          playAudio();
+          return;
         }
-        playAudio();
       }
     }
   };
 
   const handleMicrophone = () => {
-    if(isListening){
+    if (isListening) {
       SpeechRecognition.stopListening()
       inputRef.current.value += transcript;
-    }else{
+    } else {
       SpeechRecognition.startListening({ language: 'zh-CN' })
     }
     setIsListening(!isListening);
@@ -66,6 +73,8 @@ function App() {
 
   const handleSend = () => {
     let inputValue = inputRef.current.value;
+    if (inputValue === "") return;
+
     inputRef.current.value = "";
 
     //clear active message
@@ -107,21 +116,25 @@ function App() {
       } else {
         audioMap.get(reqID).push(audio);
       }
-      if (audio.index === 1 || (currentAudio && audio.index === currentAudio.index + 1)) {
+      if (audio.index === 1 || (currentAudio && !currentAudio.playing && audio.index === currentAudio.index + 1)) {
         currentAudio = {
           index: audio.index,
-          src: audio.src,
+          src: audio.url,
           reqestID: reqID,
         }
+        console.log("播放新音频: ", reqID, currentAudio, audio)
         playAudio();
       }
+
     }, (error) => {
+      console.log("chat failed, err: ", error)
       toast.error("聊天失败");
     });
   }
 
   const playAudio = () => {
     if (currentAudio) {
+      currentAudio.playing = true;
       let audioElement = audioRef.current;
       audioElement.src = currentAudio.src;
       audioElement.play();
@@ -137,7 +150,7 @@ function App() {
     <div className="App">
       <Navbar
         className="chat-navbar"
-        left=<div style={{ "color": "#fff", "fontWeight": "bold" }}>智慧树智能助手</div>
+        left={<div style={{ "color": "#fff", "fontWeight": "bold" }}>智慧树智能助手</div>}
         type="dark"
       />
       <div className="chat-list">
@@ -155,7 +168,7 @@ function App() {
           rightButtons={
             <div>
               <Button
-                text={isListening?"停止输入":"语音输入"}
+                text={isListening ? "停止输入" : "语音输入"}
                 onClick={handleMicrophone}
               />
               <Button
@@ -164,7 +177,6 @@ function App() {
                 backgroundColor="#2B6CB0"
               />
             </div>
-
           }
         />
       </div>
